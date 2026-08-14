@@ -90,18 +90,17 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: npm version "$VERSION" --no-git-tag-version --allow-same-version
 
-      # Pinned (not @latest) so the publish toolchain is reproducible and reviewed —
-      # bump this deliberately via a dependency update, not implicitly on each run.
-      - name: Upgrade npm
+      # Pinned (not @latest) so the OIDC trusted-publishing toolchain is reproducible and
+      # reviewed — bump this deliberately via a dependency update, not implicitly on each run.
+      - name: Upgrade npm for OIDC trusted publishing
         run: npm install -g npm@11.17.0 --no-audit
 
-      # NODE_AUTH_TOKEN until a trusted publisher is configured on npmjs.com (impossible
-      # before the package exists). Once it is, drop the env block — npm prefers OIDC.
+      # Auth comes from the npmjs.com trusted publisher bound to this repo + workflow
+      # filename; renaming this file breaks publishing until the binding is updated.
       - name: Publish to npm
         env:
           NPM_DIST_TAG: ${{ steps.version.outputs.tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance --tag "$NPM_DIST_TAG"
+        run: npm publish --access public --tag "$NPM_DIST_TAG"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
