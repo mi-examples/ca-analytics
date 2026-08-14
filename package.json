@@ -1,0 +1,66 @@
+{
+  "name": "@metricinsights/ca-analytics",
+  "version": "0.1.0",
+  "description": "Usage analytics for Metric Insights Custom Apps",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "react": "^18.3.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "keywords": [
+    "metricinsights",
+    "portal-pages",
+    "analytics",
+    "usage-tracking"
+  ],
+  "author": "Mykhailo Ozdemir",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mi-examples/ca-analytics.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mi-examples/ca-analytics/issues"
+  },
+  "homepage": "https://github.com/mi-examples/ca-analytics#readme",
+  "license": "MIT"
+}
