@@ -37,7 +37,7 @@ npm i @metricinsights/ca-analytics
 import { init, useAnalytics } from '@metricinsights/ca-analytics';
 
 // app entry, once
-init({ app: 'my-portal-page' });
+init();
 
 // anywhere in the app
 const { track } = useAnalytics();
@@ -82,13 +82,7 @@ Every option is optional. Each falls back to a portal-page variable, then to a d
 
 | Option | Variable | Default | Effect |
 | --- | --- | --- | --- |
-| `app` | — | derived from the URL | Portal page internal name. |
 | `enabled` | `CUSTOM_APP_ANALYTICS_ENABLED` | `true` | `false` disables all tracking. |
-
-`app` is derived from `location.pathname` against `/^\/(p[tl]?)\/([^/]+)(.*)$/`. **If it cannot
-be derived and isn't passed, `init()` stays silent** rather than writing rows with a blank `app`
-that nothing could attribute. This is why a bare `init()` does nothing on a local dev server,
-where the path is `/`.
 
 Portal-page variables are read from `window.PP_VARIABLES` and always arrive as **strings**.
 `'0'`, `'false'`, `'n'`, `'no'` (case-insensitive, trimmed) mean disabled; any other non-empty
@@ -101,7 +95,7 @@ Analytics Enabled]`) counts as *not set* and falls through to the option or defa
 | --- | --- | --- |
 | `page_view` | Once on `init()`, then on every `pushState` / `replaceState` / `popstate`, or on demand via `trackPageView()`. | `referrer`, `query` — always both, always strings |
 | `heartbeat` | Tab visible: every 60s for 5 beats, then every 300s. | `{}` |
-| `component_render` | The `mi-render` `CustomEvent` MI dispatches on `document`. | `component`, `element_id`, `segment_id` |
+| `component_render` | The `mi-render` `CustomEvent` MI dispatches on `document`. | `component`, `element_id`, `segment_id`, plus each prop as `prop.<path>` |
 | `element_click` | `trackElement()`. | `element_id`, `segment_id`, plus your own keys |
 | *(custom)* | `track(name, props)`. | your `props` verbatim |
 
@@ -123,11 +117,22 @@ sync does not emit. `meta.referrer` follows GA4 semantics: the first view of the
 previous view. `meta.query` is `location.search` without the leading `?`. Both are capped at 300
 characters; either can be `''`.
 
-**`component_render`** reads `detail.component` plus `detail.props`, accepting either
-`{element, segment}` or `{element_id, segment_value_id}`. Capped at 50 emits per distinct
-component + element + segment per page load; the emit that hits the cap carries `capped: 1`.
-`MiNamespace.render()` is a pure event emitter, so listening on `document` observes every shared
-component render without patching or wrapping anything.
+**`component_render`** reads `detail.component` plus `detail.props`. `MiNamespace.render()` is a
+pure event emitter, so `document` sees every shared component render — no patching.
+
+Identity comes only from `element`/`element_id` and `segment`/`segment_id`/`segment_value_id` —
+the spellings MI's own components use. No other key feeds `element_id`, which joins to
+`/api/element_info`, where a foreign numeric id would join wrong.
+
+Every other prop flattens to `prop.<dotted.path>` — flat, because the dashboard summarizes per
+key and a nested object collapses to one opaque string. Scalars verbatim, strings capped at 40,
+arrays as `arr:<length>`, 4 levels deep, 20 keys.
+
+Props are stored verbatim and readable by anyone with dashboard access. Keep record-specific text
+out of props you render with.
+
+Capped at 50 emits per distinct component + element + segment + props; the capping emit carries
+`capped: 1`. Past 200 buckets a page load, further renders share one.
 
 **`trackElement`** needs `element_id` to be finite and non-zero — anything else drops the event
 (one `console.warn` per runtime). `segment_id` is optional and defaults to `0` when omitted, with
@@ -148,13 +153,16 @@ stamps itself — the client never sends it.
 | --- | --- | --- |
 | `id` | text | Client UUID. Reused across a retry so readers dedupe with `COUNT(DISTINCT id)`. |
 | `ts` | datetime | `YYYY-MM-DD HH:MM:SS`, UTC. **Never ISO** — see [One-way doors](#one-way-doors). |
-| `app` | text | Portal page internal name, capped at 100. |
+| `app` | text | Portal page internal name, read from `location.pathname` against `/^\/(p[tl]?)\/([^/]+)(.*)$/`. Capped at 100. |
 | `event` | text | Capped at 100. |
 | `session_id` | text | New session after 30 minutes idle. Survives reloads via `localStorage`. |
 | `page_path` | text | Route below the portal page, `/` at the root. Capped at 400. |
 | `element_id` | int | `0` when not applicable. Integers only. |
 | `version` | text | This package's version, capped at 20. |
 | `meta` | text | JSON string, capped at 2000. |
+
+`pp-dev` serves that same path locally. **Off that path shape, `init()` stays silent** rather
+than writing rows with a blank `app` that nothing could attribute.
 
 Text columns are wide (10500) and the caps above are client-side payload budget, keeping a batch
 inside `sendBeacon`'s 64 KiB quota — they are not schema limits.

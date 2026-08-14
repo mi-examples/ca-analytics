@@ -49,7 +49,8 @@ export function resolveConfig(options: Options = {}): ResolvedConfig | null {
 
   if (!enabled) return null;
 
-  const app = (options.app ?? matchPage()?.[2] ?? '').slice(0, WIDTHS.app);
+  // Page internal_name: both the row's attribution key and the write endpoint's page.
+  const app = (matchPage()?.[2] ?? '').slice(0, WIDTHS.app);
 
   if (!app) return null;
 

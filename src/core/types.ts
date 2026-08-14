@@ -1,8 +1,6 @@
 export type JsonValue = string | number | boolean | null | undefined | JsonValue[] | { [key: string]: JsonValue };
 
 export interface Options {
-  /** Portal page internal_name. Default: derived from URL. */
-  app?: string;
   /** false disables all tracking. Overrides PP_VARIABLES. */
   enabled?: boolean;
 }
