@@ -62,5 +62,8 @@
     "url": "https://github.com/mi-examples/ca-analytics/issues"
   },
   "homepage": "https://github.com/mi-examples/ca-analytics#readme",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  }
 }

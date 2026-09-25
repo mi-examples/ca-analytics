@@ -204,6 +204,15 @@ wrapped.
 >   (`int → float → text`). One float or string converts the column permanently.
 > - **Never send `owner_user_id`.** The server stamps it and creates the column itself.
 
+## Releases
+
+Releases use the shared workflows from [mi-examples-workflows](https://github.com/mi-examples/mi-examples-workflows) ([release flow](https://github.com/mi-examples/mi-examples-workflows/blob/main/docs/workflows.md#release-workflows)). This repository has no `develop` branch, so there are no betas:
+
+1. Run **Actions → Release → Run workflow**. It opens a release pull request `release/vX.Y.Z → main` with the version bump and the new `CHANGELOG.md` entry.
+2. Review and edit the entry in the pull request, then merge it.
+3. Merging publishes to npm under `latest` and creates the tag and the GitHub release.
+
+Versions come from [Conventional Commits](https://www.conventionalcommits.org/) (`feat` → minor; `fix`, `perf`, `revert` → patch; `!` or `BREAKING CHANGE:` → major). Publishing uses npm Trusted Publishing (OIDC) from `.github/workflows/release.yml`, so don't rename that file.
 ## License
 
 MIT © 2026 Metric Insights
