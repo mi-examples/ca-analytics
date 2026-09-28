@@ -62,13 +62,17 @@ export function sendOnUnload(endpoint: string, rows: string[]): void {
     // fall through to keepalive fetch
   }
 
+  // try/catch only sees a synchronous throw; the .catch keeps a rejected request (e.g. over the
+  // keepalive quota) from surfacing as an unhandled rejection in the host app.
   try {
-    void fetch(endpoint, {
+    fetch(endpoint, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body,
       keepalive: true,
+    }).catch(() => {
+      // Dropped. Nothing further possible at unload.
     });
   } catch {
     // Dropped. Nothing further possible at unload.
