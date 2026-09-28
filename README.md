@@ -33,19 +33,22 @@ npm i @metricinsights/ca-analytics
 
 ## Usage
 
-```ts
+```tsx
 import { init, useAnalytics } from '@metricinsights/ca-analytics';
 
 // app entry, once
 init();
 
-// anywhere in the app
-const { track } = useAnalytics();
-track('tile_clicked', { tile: 'revenue' });
+// in any component
+function RevenueTile() {
+  const { track } = useAnalytics();
+
+  return <button onClick={() => track('tile_clicked', { tile: 'revenue' })}>Revenue</button>;
+}
 ```
 
 `useAnalytics()` is a thin wrapper over the module singleton — no provider, no context, callable
-from any component.
+from any component. Outside React, import `track`, `trackElement` and `trackPageView` directly.
 
 ## API
 
@@ -111,8 +114,8 @@ name that does not match is still tracked verbatim but logs one console warning,
 dataset is append-only with no rename — `'Tile Click'`, `'tile_click '` and `'tileClick'` would
 become three permanent, unmergeable series. Reserved-name matching is case-insensitive.
 
-Two meta keys are reserved: `_truncated` is stamped only when meta actually exceeds 2000
-characters, and the dashboard hides both `_truncated` and `capped` from its property view, so do
+Two meta keys are reserved: `_truncated` is stamped only when meta exceeds 2000 characters or
+cannot be serialized as a whole (for example a `BigInt` or a circular value), and the dashboard hides both `_truncated` and `capped` from its property view, so do
 not use either as your own prop name.
 
 **`page_view`** dedupes on path + search (+ hash route, see below), so a router calling
@@ -137,13 +140,15 @@ the spellings MI's own components use. No other key feeds `element_id`, which jo
 
 Every other prop flattens to `prop.<dotted.path>` — flat, because the dashboard summarizes per
 key and a nested object collapses to one opaque string. Scalars verbatim, strings capped at 40,
-arrays as `arr:<length>`, 4 levels deep, 20 keys.
+arrays as `arr:<length>`, 4 levels deep, 40 keys. When the depth or key cap drops a prop, the row
+carries `props_dropped: 1`.
 
 Props are stored verbatim and readable by anyone with dashboard access. Keep record-specific text
 out of props you render with.
 
 Capped at 50 emits per distinct component + element + segment + props; the capping emit carries
-`capped: 1`. Past 200 buckets a page load, further renders share one.
+`capped: 1`. Past 200 distinct buckets per `init()`, a render that would open a new bucket goes into
+one shared overflow bucket per component instead, which has the same cap of 50.
 
 **`trackElement`** needs `element_id` to be a non-zero number within the `int` column's range
 (−2³¹ … 2³¹−1; a fraction is truncated) — anything else drops the event
@@ -180,7 +185,8 @@ Text columns are wide (10500) and the caps above are client-side payload budget,
 inside `sendBeacon`'s 64 KiB quota — they are not schema limits.
 
 `meta` over 2000 characters drops whole keys rather than slicing, so the stored value always
-parses, and stamps `_truncated: 1`.
+parses, and stamps `_truncated: 1`. Meta that `JSON.stringify` cannot serialize as a whole takes the
+same path: keys that fail on their own are dropped, and `_truncated: 1` is stamped.
 
 ## Delivery
 
