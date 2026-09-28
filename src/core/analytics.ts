@@ -175,7 +175,7 @@ export function trackElement(props: { element_id: number; segment_id?: number; [
     const id = toId(element_id);
 
     if (!id) {
-      warnOnce('element', `trackElement() ignored a non-finite or zero element_id (${element_id})`);
+      warnOnce('element', `trackElement() ignored a zero, non-finite or out-of-range element_id (${element_id})`);
 
       return;
     }

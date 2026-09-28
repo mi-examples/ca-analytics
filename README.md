@@ -141,7 +141,8 @@ out of props you render with.
 Capped at 50 emits per distinct component + element + segment + props; the capping emit carries
 `capped: 1`. Past 200 buckets a page load, further renders share one.
 
-**`trackElement`** needs `element_id` to be finite and non-zero — anything else drops the event
+**`trackElement`** needs `element_id` to be a non-zero number within the `int` column's range
+(−2³¹ … 2³¹−1; a fraction is truncated) — anything else drops the event
 (one `console.warn` per runtime). `segment_id` is optional and defaults to `0` when omitted, with
 no warning; a supplied non-finite value also records `0` but logs one `console.warn` per runtime.
 Extra props pass through to `meta` untouched, and
