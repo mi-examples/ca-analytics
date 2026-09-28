@@ -6,7 +6,7 @@ import { getSessionId, resetSession } from './session';
 import { startHeartbeat } from './signals/heartbeat';
 import { startMiRender } from './signals/miRender';
 import { startPageView, type PageViewSignal } from './signals/pageview';
-import type { JsonValue, Options } from './types';
+import type { Options } from './types';
 
 type Emit = (
   event: string,
@@ -145,7 +145,8 @@ export function init(options: Options = {}): void {
   });
 }
 
-export function track(event: string, props?: Record<string, JsonValue>): void {
+/** `props` is any object, interface-typed included; it is serialized like JSON.stringify (a Date becomes its ISO string). */
+export function track(event: string, props?: object): void {
   guard(() => {
     if (!runtime) return;
     if (!event) return;
@@ -162,12 +163,15 @@ export function track(event: string, props?: Record<string, JsonValue>): void {
       warnOnce('name', `"${event}" is not snake_case ≤100 chars; tracked as-is (further occurrences are silent)`);
     }
 
-    runtime.emit(event, { meta: props });
+    runtime.emit(event, { meta: props as Record<string, unknown> | undefined });
   });
 }
 
-/** `element_id`/`segment_id` resolve identity via `/api/element_info`; everything else is free-form. */
-export function trackElement(props: { element_id: number; segment_id?: number; [key: string]: JsonValue }): void {
+/**
+ * `element_id`/`segment_id` resolve identity via `/api/element_info`; everything else is free-form. Generic so
+ * interface-typed props with extra keys are accepted — an index signature would reject them.
+ */
+export function trackElement<T extends { element_id: number; segment_id?: number }>(props: T): void {
   guard(() => {
     if (!runtime) return;
 

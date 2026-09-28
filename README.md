@@ -64,10 +64,14 @@ later `init()` inside the 30-minute idle window resumes the *same* `session_id`.
 
 | Export | Signature | Notes |
 | --- | --- | --- |
-| `track` | `(event: string, props?: Record<string, unknown>) => void` | Empty and [reserved](#events) names are ignored. |
-| `trackElement` | `(props: { element_id: number; segment_id?: number; [key: string]: unknown }) => void` | Emits `element_click`. |
+| `track` | `(event: string, props?: object) => void` | Empty and [reserved](#events) names are ignored. |
+| `trackElement` | `<T extends { element_id: number; segment_id?: number }>(props: T) => void` | Emits `element_click`. |
 | `trackPageView` | `(path?: string) => void` | For routers the `history` patch cannot observe. Skips dedupe — always emits. |
 | `useAnalytics` | `() => { track, trackElement, trackPageView }` | React hook; no provider needed. |
+
+Props can be any object, including interface-typed ones, with values of any type. They are
+serialized with `JSON.stringify` semantics: a `Date` becomes its ISO string, and `undefined` and
+functions are dropped.
 
 ### Constants
 

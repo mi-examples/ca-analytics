@@ -1,3 +1,4 @@
+/** No longer used by the tracking signatures, which accept any value; still exported so existing imports keep compiling. */
 export type JsonValue = string | number | boolean | null | undefined | JsonValue[] | { [key: string]: JsonValue };
 
 export interface Options {

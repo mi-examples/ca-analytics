@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { sendOnUnload } from '../src/core/transport';
 
+// Node global, typed locally rather than pulling in @types/node for one listener.
+declare const process: {
+  on(event: 'unhandledRejection', listener: (reason: unknown) => void): void;
+  off(event: 'unhandledRejection', listener: (reason: unknown) => void): void;
+};
+
 describe('sendOnUnload', () => {
   const unhandled = vi.fn();
 
