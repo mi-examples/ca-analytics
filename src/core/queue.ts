@@ -63,6 +63,9 @@ export function createQueue(endpoint: string, onKilled?: () => void): Queue {
         outcome = 'failed';
       }
 
+      // Stopped while the request was out: a stale result must not count toward, or trip, the kill-switch.
+      if (stopped) return;
+
       if (outcome === 'ok') {
         failures = 0;
         return;

@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // A portal-page URL, so init() resolves an app instead of staying silent.
+    environmentOptions: { jsdom: { url: 'http://localhost/p/test-app/' } },
     include: ['test/**/*.test.ts'],
     restoreMocks: true,
     unstubGlobals: true,

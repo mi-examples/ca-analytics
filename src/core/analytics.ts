@@ -90,8 +90,11 @@ export function init(options: Options = {}): void {
 
     if (!config) return;
 
-    // A tripped kill-switch tears down ca-analytics entirely, not just the queue.
-    const queue = createQueue(config.endpoint, () => shutdown());
+    // A tripped kill-switch tears down ca-analytics entirely, not just the queue — but only while this
+    // queue's runtime is still the live one, so a stale queue can't kill a later init().
+    const queue: Queue = createQueue(config.endpoint, () => {
+      if (runtime?.queue === queue) shutdown();
+    });
 
     const emit: Emit = (event, extra = {}) => {
       queue.push(
