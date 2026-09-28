@@ -32,15 +32,42 @@ function matchPage(): RegExpExecArray | null {
   return MI_PAGE_PATH_RE.exec(window.location.pathname);
 }
 
-/** Route below the portal page. '/' at the page root. */
+/** A hash router's fragment (`#/reports`). A plain in-page anchor (`#section`) is not a route. */
+export function isHashRoute(hash: string): boolean {
+  return hash.startsWith('#/');
+}
+
+/** Path and query a hash router keeps in the fragment: `#/reports?tab=1` → `/reports`, `tab=1`. Null without one. */
+function hashRoute(): { path: string; query: string } | null {
+  const hash = window.location.hash;
+
+  if (!isHashRoute(hash)) return null;
+
+  const route = hash.slice(1);
+  const pathEnd = route.search(/[?#]/);
+  const path = pathEnd === -1 ? route : route.slice(0, pathEnd);
+  const queryMatch = /\?([^#]*)/.exec(route);
+
+  return { path, query: queryMatch ? queryMatch[1] : '' };
+}
+
+/** Route below the portal page. '/' at the page root. A hash route, when present, is the route. */
 export function currentPagePath(): string {
   const match = matchPage();
 
   if (!match) return '/';
 
-  const rest = match[3];
+  const rest = hashRoute()?.path ?? match[3];
 
   return (rest && rest !== '' && rest !== '/' ? rest : '/').slice(0, WIDTHS.page_path);
+}
+
+/** `location.search` without the `?`, joined with `&` to a hash route's own query. */
+export function currentQuery(): string {
+  const outer = window.location.search.replace(/^\?/, '');
+  const inner = hashRoute()?.query ?? '';
+
+  return outer && inner ? `${outer}&${inner}` : outer || inner;
 }
 
 /** Runtime config, or null when ca-analytics must stay silent: disabled, or not on a portal page. */

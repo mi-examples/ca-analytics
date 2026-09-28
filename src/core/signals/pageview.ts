@@ -1,3 +1,5 @@
+import { isHashRoute } from '../config';
+
 export interface PageViewSignal {
   stop(): void;
   emitNow(path?: string): void;
@@ -18,7 +20,7 @@ const inboundReferrer = (): string => {
   }
 };
 
-/** Emits once on start, then on every history navigation. The original history method always still runs. */
+/** Emits once on start, then on every history or hash navigation. The original history method always still runs. */
 export function startPageView(
   emit: (path: string, referrer: string) => void,
   currentPath: () => string,
@@ -27,10 +29,13 @@ export function startPageView(
   let lastPath: string | null = null;
   let lastLocation: string | null = null;
 
-  // Dedupe key: path alone can't tell a `?tab=` change from a no-op replaceState.
+  // Dedupe key: path alone can't tell a `?tab=` change from a no-op replaceState. A hash route
+  // (`#/reports?tab=1`) is part of it; a plain in-page anchor (`#section`) is not a new view.
   const locationKey = (path: string): string => {
     try {
-      return `${path}${window.location.search}`;
+      const { search, hash } = window.location;
+
+      return `${path}${search}${isHashRoute(hash) ? hash : ''}`;
     } catch {
       return path;
     }
@@ -80,6 +85,8 @@ export function startPageView(
   const onPopState = () => safeEmit(currentPath, true);
 
   window.addEventListener('popstate', onPopState);
+  // Hash routers and `location.hash = …` navigate without pushState; dedupe drops the popstate twin.
+  window.addEventListener('hashchange', onPopState);
 
   safeEmit(currentPath, true);
 
@@ -99,6 +106,7 @@ export function startPageView(
       }
 
       window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('hashchange', onPopState);
     },
     emitNow(path?: string): void {
       safeEmit(() => path ?? currentPath(), false);

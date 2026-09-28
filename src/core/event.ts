@@ -12,11 +12,17 @@ export interface RowInput {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** Integer only: a float or string value widens the `int` column permanently. */
-export function toId(value: unknown): number {
-  const n = Number(value);
+const INT32_MIN = -(2 ** 31);
+const INT32_MAX = 2 ** 31 - 1;
 
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
+/**
+ * Integer only: a float or string value widens the `int` column permanently. Out-of-int32 values are 0,
+ * since past 2^31-1 the column overflows and past 1e21 the number serializes as `1e+21`.
+ */
+export function toId(value: unknown): number {
+  const n = Math.trunc(Number(value));
+
+  return Number.isSafeInteger(n) && n >= INT32_MIN && n <= INT32_MAX ? n : 0;
 }
 
 /** Space-separated, never ISO — a `T`/`Z` sniffs as text and the column stops being `datetime`. */

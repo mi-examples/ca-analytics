@@ -21,6 +21,28 @@ export interface Queue {
   stop(): void;
 }
 
+/** Splits rows into batches whose `[a,b,c]` body stays within maxBytes. A lone row over the limit still goes, alone. */
+function chunkBySize(rows: Buffered[], maxBytes: number): Buffered[][] {
+  const chunks: Buffered[][] = [];
+  let current: Buffered[] = [];
+  let size = 2;
+
+  for (const row of rows) {
+    if (current.length > 0 && size + 1 + row.size > maxBytes) {
+      chunks.push(current);
+      current = [];
+      size = 2;
+    }
+
+    size += (current.length > 0 ? 1 : 0) + row.size;
+    current.push(row);
+  }
+
+  if (current.length > 0) chunks.push(current);
+
+  return chunks;
+}
+
 export function createQueue(endpoint: string, onKilled?: () => void): Queue {
   let buffer: Buffered[] = [];
   let bytes = 0;
@@ -50,8 +72,9 @@ export function createQueue(endpoint: string, onKilled?: () => void): Queue {
     bytes = 0;
     inFlight = true;
 
+    let outcome: SendOutcome = 'failed';
+
     try {
-      let outcome: SendOutcome;
 
       // send() isn't expected to reject, but a rejection must not become an unhandled promise rejection.
       try {
@@ -62,6 +85,9 @@ export function createQueue(endpoint: string, onKilled?: () => void): Queue {
       } catch {
         outcome = 'failed';
       }
+
+      // Stopped while the request was out: a stale result must not count toward, or trip, the kill-switch.
+      if (stopped) return;
 
       if (outcome === 'ok') {
         failures = 0;
@@ -85,6 +111,12 @@ export function createQueue(endpoint: string, onKilled?: () => void): Queue {
       }
     } finally {
       inFlight = false;
+
+      // push() only flushes on its own threshold check, which is a no-op while a request is out; rows
+      // that piled up meanwhile would otherwise wait for the timer and could outgrow the beacon quota.
+      // Only after a success: re-flushing a failure straight away would spend the kill-switch's three
+      // strikes within seconds of a brief outage, instead of across timer ticks.
+      if (!stopped && outcome === 'ok' && (buffer.length >= MAX_FLUSH_ROWS || bytes >= MAX_FLUSH_BYTES)) void flush();
     }
   }
 
@@ -117,10 +149,15 @@ export function createQueue(endpoint: string, onKilled?: () => void): Queue {
 
       buffer = [];
       bytes = 0;
-      sendOnUnload(
-        endpoint,
-        batch.map((b) => b.json),
-      );
+
+      // One body over the 64 KiB quota fails in both sendBeacon and keepalive fetch and drops every row;
+      // flush-sized chunks let at least the ones that fit through.
+      for (const chunk of chunkBySize(batch, MAX_FLUSH_BYTES)) {
+        sendOnUnload(
+          endpoint,
+          chunk.map((b) => b.json),
+        );
+      }
     },
     stop,
   };

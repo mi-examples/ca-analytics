@@ -1,12 +1,12 @@
 import { EVENT_NAME_RE, LIMITS, RESERVED_EVENTS } from './constants';
-import { currentPagePath, resolveConfig } from './config';
+import { currentPagePath, currentQuery, resolveConfig } from './config';
 import { createRow, toId } from './event';
 import { createQueue, type Queue } from './queue';
 import { getSessionId, resetSession } from './session';
 import { startHeartbeat } from './signals/heartbeat';
 import { startMiRender } from './signals/miRender';
 import { startPageView, type PageViewSignal } from './signals/pageview';
-import type { JsonValue, Options } from './types';
+import type { Options } from './types';
 
 type Emit = (
   event: string,
@@ -43,7 +43,7 @@ function warnOnce(key: string, message: string): void {
 }
 
 function pageViewMeta(referrer: string): Record<string, unknown> {
-  const query = window.location.search.replace(/^\?/, '');
+  const query = currentQuery();
 
   return { referrer: referrer.slice(0, LIMITS.referrer), query: query.slice(0, LIMITS.query) };
 }
@@ -90,8 +90,11 @@ export function init(options: Options = {}): void {
 
     if (!config) return;
 
-    // A tripped kill-switch tears down ca-analytics entirely, not just the queue.
-    const queue = createQueue(config.endpoint, () => shutdown());
+    // A tripped kill-switch tears down ca-analytics entirely, not just the queue — but only while this
+    // queue's runtime is still the live one, so a stale queue can't kill a later init().
+    const queue: Queue = createQueue(config.endpoint, () => {
+      if (runtime?.queue === queue) shutdown();
+    });
 
     const emit: Emit = (event, extra = {}) => {
       queue.push(
@@ -142,7 +145,8 @@ export function init(options: Options = {}): void {
   });
 }
 
-export function track(event: string, props?: Record<string, JsonValue>): void {
+/** `props` is any object, interface-typed included; it is serialized like JSON.stringify (a Date becomes its ISO string). */
+export function track(event: string, props?: object): void {
   guard(() => {
     if (!runtime) return;
     if (!event) return;
@@ -159,12 +163,15 @@ export function track(event: string, props?: Record<string, JsonValue>): void {
       warnOnce('name', `"${event}" is not snake_case ≤100 chars; tracked as-is (further occurrences are silent)`);
     }
 
-    runtime.emit(event, { meta: props });
+    runtime.emit(event, { meta: props as Record<string, unknown> | undefined });
   });
 }
 
-/** `element_id`/`segment_id` resolve identity via `/api/element_info`; everything else is free-form. */
-export function trackElement(props: { element_id: number; segment_id?: number; [key: string]: JsonValue }): void {
+/**
+ * `element_id`/`segment_id` resolve identity via `/api/element_info`; everything else is free-form. Generic so
+ * interface-typed props with extra keys are accepted — an index signature would reject them.
+ */
+export function trackElement<T extends { element_id: number; segment_id?: number }>(props: T): void {
   guard(() => {
     if (!runtime) return;
 
@@ -172,7 +179,7 @@ export function trackElement(props: { element_id: number; segment_id?: number; [
     const id = toId(element_id);
 
     if (!id) {
-      warnOnce('element', `trackElement() ignored a non-finite or zero element_id (${element_id})`);
+      warnOnce('element', `trackElement() ignored a zero, non-finite or out-of-range element_id (${element_id})`);
 
       return;
     }

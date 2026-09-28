@@ -33,19 +33,22 @@ npm i @metricinsights/ca-analytics
 
 ## Usage
 
-```ts
+```tsx
 import { init, useAnalytics } from '@metricinsights/ca-analytics';
 
 // app entry, once
 init();
 
-// anywhere in the app
-const { track } = useAnalytics();
-track('tile_clicked', { tile: 'revenue' });
+// in any component
+function RevenueTile() {
+  const { track } = useAnalytics();
+
+  return <button onClick={() => track('tile_clicked', { tile: 'revenue' })}>Revenue</button>;
+}
 ```
 
 `useAnalytics()` is a thin wrapper over the module singleton — no provider, no context, callable
-from any component.
+from any component. Outside React, import `track`, `trackElement` and `trackPageView` directly.
 
 ## API
 
@@ -64,10 +67,14 @@ later `init()` inside the 30-minute idle window resumes the *same* `session_id`.
 
 | Export | Signature | Notes |
 | --- | --- | --- |
-| `track` | `(event: string, props?: Record<string, unknown>) => void` | Empty and [reserved](#events) names are ignored. |
-| `trackElement` | `(props: { element_id: number; segment_id?: number; [key: string]: unknown }) => void` | Emits `element_click`. |
+| `track` | `(event: string, props?: object) => void` | Empty and [reserved](#events) names are ignored. |
+| `trackElement` | `<T extends { element_id: number; segment_id?: number }>(props: T) => void` | Emits `element_click`. |
 | `trackPageView` | `(path?: string) => void` | For routers the `history` patch cannot observe. Skips dedupe — always emits. |
 | `useAnalytics` | `() => { track, trackElement, trackPageView }` | React hook; no provider needed. |
+
+Props can be any object, including interface-typed ones, with values of any type. They are
+serialized with `JSON.stringify` semantics: a `Date` becomes its ISO string, and `undefined` and
+functions are dropped.
 
 ### Constants
 
@@ -93,7 +100,7 @@ Analytics Enabled]`) counts as *not set* and falls through to the option or defa
 
 | Event | Fires when | `meta` |
 | --- | --- | --- |
-| `page_view` | Once on `init()`, then on every `pushState` / `replaceState` / `popstate`, or on demand via `trackPageView()`. | `referrer`, `query` — always both, always strings |
+| `page_view` | Once on `init()`, then on every `pushState` / `replaceState` / `popstate` / `hashchange`, or on demand via `trackPageView()`. | `referrer`, `query` — always both, always strings |
 | `heartbeat` | Tab visible: every 60s for 5 beats, then every 300s. | `{}` |
 | `component_render` | The `mi-render` `CustomEvent` MI dispatches on `document`. | `component`, `element_id`, `segment_id`, plus each prop as `prop.<path>` |
 | `element_click` | `trackElement()`. | `element_id`, `segment_id`, plus your own keys |
@@ -107,15 +114,22 @@ name that does not match is still tracked verbatim but logs one console warning,
 dataset is append-only with no rename — `'Tile Click'`, `'tile_click '` and `'tileClick'` would
 become three permanent, unmergeable series. Reserved-name matching is case-insensitive.
 
-Two meta keys are reserved: `_truncated` is stamped only when meta actually exceeds 2000
-characters, and the dashboard hides both `_truncated` and `capped` from its property view, so do
+Two meta keys are reserved: `_truncated` is stamped only when meta exceeds 2000 characters or
+cannot be serialized as a whole (for example a `BigInt` or a circular value), and the dashboard hides both `_truncated` and `capped` from its property view, so do
 not use either as your own prop name.
 
-**`page_view`** dedupes on path + search, so a router calling `replaceState` for scroll or filter
-sync does not emit. `meta.referrer` follows GA4 semantics: the first view of the document uses
-`document.referrer` normalized to origin + pathname; every later view uses the `page_path` of the
-previous view. `meta.query` is `location.search` without the leading `?`. Both are capped at 300
-characters; either can be `''`.
+**`page_view`** dedupes on path + search (+ hash route, see below), so a router calling
+`replaceState` for scroll or filter sync does not emit. `meta.referrer` follows GA4 semantics: the
+first view of the document uses `document.referrer` normalized to origin + pathname; every later
+view uses the `page_path` of the previous view. `meta.query` is `location.search` without the
+leading `?`. Both are capped at 300 characters; either can be `''`.
+
+**Hash routing.** Hash-routed apps (for example React Router's `HashRouter`) are tracked without
+extra setup. When `location.hash` starts with `#/`, the fragment is the route: `#/reports/42?tab=1`
+records `page_path` `/reports/42` (it replaces any path below the portal page), and the fragment's
+own query is appended to `meta.query` with `&` (`?embed=1#/reports?tab=1` → `embed=1&tab=1`). A
+change of the hash route is a new view. A plain in-page anchor (`#section`, anything not starting
+with `#/`) is not a route: it never changes `page_path` and never emits a `page_view`.
 
 **`component_render`** reads `detail.component` plus `detail.props`. `MiNamespace.render()` is a
 pure event emitter, so `document` sees every shared component render — no patching.
@@ -126,15 +140,18 @@ the spellings MI's own components use. No other key feeds `element_id`, which jo
 
 Every other prop flattens to `prop.<dotted.path>` — flat, because the dashboard summarizes per
 key and a nested object collapses to one opaque string. Scalars verbatim, strings capped at 40,
-arrays as `arr:<length>`, 4 levels deep, 20 keys.
+arrays as `arr:<length>`, 4 levels deep, 40 keys. When the depth or key cap drops a prop, the row
+carries `props_dropped: 1`.
 
 Props are stored verbatim and readable by anyone with dashboard access. Keep record-specific text
 out of props you render with.
 
 Capped at 50 emits per distinct component + element + segment + props; the capping emit carries
-`capped: 1`. Past 200 buckets a page load, further renders share one.
+`capped: 1`. Past 200 distinct buckets per `init()`, a render that would open a new bucket goes into
+one shared overflow bucket per component instead, which has the same cap of 50.
 
-**`trackElement`** needs `element_id` to be finite and non-zero — anything else drops the event
+**`trackElement`** needs `element_id` to be a non-zero number within the `int` column's range
+(−2³¹ … 2³¹−1; a fraction is truncated) — anything else drops the event
 (one `console.warn` per runtime). `segment_id` is optional and defaults to `0` when omitted, with
 no warning; a supplied non-finite value also records `0` but logs one `console.warn` per runtime.
 Extra props pass through to `meta` untouched, and
@@ -156,7 +173,7 @@ stamps itself — the client never sends it.
 | `app` | text | Portal page internal name, read from `location.pathname` against `/^\/(p[tl]?)\/([^/]+)(.*)$/`. Capped at 100. |
 | `event` | text | Capped at 100. |
 | `session_id` | text | New session after 30 minutes idle. Survives reloads via `localStorage`. |
-| `page_path` | text | Route below the portal page, `/` at the root. Capped at 400. |
+| `page_path` | text | Route below the portal page, `/` at the root; a `#/` hash route when present (see [Hash routing](#events)). Capped at 400. |
 | `element_id` | int | `0` when not applicable. Integers only. |
 | `version` | text | This package's version, capped at 20. |
 | `meta` | text | JSON string, capped at 2000. |
@@ -168,13 +185,15 @@ Text columns are wide (10500) and the caps above are client-side payload budget,
 inside `sendBeacon`'s 64 KiB quota — they are not schema limits.
 
 `meta` over 2000 characters drops whole keys rather than slicing, so the stored value always
-parses, and stamps `_truncated: 1`.
+parses, and stamps `_truncated: 1`. Meta that `JSON.stringify` cannot serialize as a whole takes the
+same path: keys that fail on their own are dropped, and `_truncated: 1` is stamped.
 
 ## Delivery
 
 Rows buffer and flush on whichever comes first: 15 seconds, 50 rows, or 30 KB encoded. On
 `pagehide`, and on `visibilitychange` to hidden (which is what actually fires on iOS), the buffer
-goes out via `sendBeacon`, falling back to `fetch(…, { keepalive: true })`.
+goes out via `sendBeacon`, falling back to `fetch(…, { keepalive: true })`, in chunks of at most
+30 KB each.
 
 A failed batch retries once after 2 seconds — network errors, 429 and 5xx are retryable; a `200`
 carrying a non-zero `resultCode` is a rejected insert and is not. A failed batch is dropped, not
