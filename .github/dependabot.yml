@@ -1,5 +1,30 @@
 version: 2
 updates:
+  # All npm dependencies are development dependencies (the build toolchain
+  # and the React types for type checking); react is a peer dependency.
+  # Updates don't change what the package ships, so they are chores and
+  # don't cut a release. Minor and patch updates arrive as one pull request.
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    # Give the community a week to spot a compromised release before we pick it up.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    groups:
+      dev-dependencies:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    ignore:
+      # TypeScript 7 breaks tsup's declaration build (rollup-plugin-dts:
+      # "Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')").
+      # Remove this once tsup supports it.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
