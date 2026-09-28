@@ -59,6 +59,28 @@ describe('queue thresholds', () => {
     expect(bodies[0].length + bodies[1].length).toBe(110);
   });
 
+  it('does not re-flush straight after a failed request, so a brief outage does not spend the kill-switch', async () => {
+    const pending: Array<(value: unknown) => void> = [];
+    const fetchMock = vi.fn(() => new Promise((resolve) => pending.push(resolve)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    queue = createQueue('/endpoint');
+
+    for (let i = 0; i < 50; i += 1) queue.push(bigRow(i));
+    for (let i = 50; i < 110; i += 1) queue.push(bigRow(i));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // 400 is not retried by the transport, so this is one failed flush.
+    pending[0]({ ok: false, status: 400, json: async () => ({}) });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Still over the thresholds, but the next attempt waits for the interval.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('flushOnUnload splits a large buffer into beacons no larger than the flush byte limit', async () => {
     // First request never settles, so everything pushed afterwards stays buffered.
     const fetchMock = vi.fn(() => new Promise(() => {}));

@@ -72,8 +72,9 @@ export function createQueue(endpoint: string, onKilled?: () => void): Queue {
     bytes = 0;
     inFlight = true;
 
+    let outcome: SendOutcome = 'failed';
+
     try {
-      let outcome: SendOutcome;
 
       // send() isn't expected to reject, but a rejection must not become an unhandled promise rejection.
       try {
@@ -113,7 +114,9 @@ export function createQueue(endpoint: string, onKilled?: () => void): Queue {
 
       // push() only flushes on its own threshold check, which is a no-op while a request is out; rows
       // that piled up meanwhile would otherwise wait for the timer and could outgrow the beacon quota.
-      if (!stopped && (buffer.length >= MAX_FLUSH_ROWS || bytes >= MAX_FLUSH_BYTES)) void flush();
+      // Only after a success: re-flushing a failure straight away would spend the kill-switch's three
+      // strikes within seconds of a brief outage, instead of across timer ticks.
+      if (!stopped && outcome === 'ok' && (buffer.length >= MAX_FLUSH_ROWS || bytes >= MAX_FLUSH_BYTES)) void flush();
     }
   }
 
