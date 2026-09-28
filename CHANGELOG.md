@@ -4,7 +4,7 @@
 
 ### ⚠ Breaking changes
 
-- The package now declares `engines.node` `>=22`, so installs on older Node.js versions may warn or fail (for example with `engine-strict`); upgrade your toolchain to Node.js 22 or later.
+- The package now declares `engines.node` `>=22`. It still runs in the browser as before; the requirement applies to the Node.js version that installs, builds or server-renders your app. Package managers with `engine-strict` refuse to install it on older Node.js, others print a warning. Use Node.js 22 or later there.
 
 ### Features
 
@@ -12,9 +12,9 @@
 
 ### Bug fixes
 
-- `track()` and `trackElement()` now accept any props object, including interface-typed props, `Date` values and `unknown` values, without TypeScript errors; runtime serialization is unchanged.
-- An `element_id` outside the 32-bit integer range is now recorded as `0` (and `trackElement()` drops the event), so it no longer overflows or permanently widens the `element_id` column.
 - A burst of events during an in-flight request no longer grows the buffer past its limits, and the unload beacon is now sent in chunks of at most 30 KB, so rows are no longer all lost when the page closes.
-- A brief outage during a burst no longer trips the kill-switch within seconds, because after a failed request the next attempt waits for the regular flush timer.
 - Calling `init()` again after `shutdown()` (HMR, user switch, StrictMode) can no longer be shut down by a stale flush from the previous runtime.
+- A brief outage during a burst no longer trips the kill-switch within seconds, because after a failed request the next attempt waits for the regular flush timer.
 - A failing `fetch` with `keepalive` on page unload no longer surfaces as an unhandled promise rejection in the host app.
+- An `element_id` outside the 32-bit integer range is now recorded as `0` (and `trackElement()` drops the event), so it no longer overflows or permanently widens the `element_id` column.
+- `track()` and `trackElement()` now accept interface-typed props and props with `Date` or `unknown` fields without TypeScript errors; runtime serialization is unchanged.
