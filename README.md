@@ -174,7 +174,8 @@ parses, and stamps `_truncated: 1`.
 
 Rows buffer and flush on whichever comes first: 15 seconds, 50 rows, or 30 KB encoded. On
 `pagehide`, and on `visibilitychange` to hidden (which is what actually fires on iOS), the buffer
-goes out via `sendBeacon`, falling back to `fetch(…, { keepalive: true })`.
+goes out via `sendBeacon`, falling back to `fetch(…, { keepalive: true })`, in chunks of at most
+30 KB each.
 
 A failed batch retries once after 2 seconds — network errors, 429 and 5xx are retryable; a `200`
 carrying a non-zero `resultCode` is a rejected insert and is not. A failed batch is dropped, not
