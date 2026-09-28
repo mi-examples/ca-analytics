@@ -1,5 +1,5 @@
 import { EVENT_NAME_RE, LIMITS, RESERVED_EVENTS } from './constants';
-import { currentPagePath, resolveConfig } from './config';
+import { currentPagePath, currentQuery, resolveConfig } from './config';
 import { createRow, toId } from './event';
 import { createQueue, type Queue } from './queue';
 import { getSessionId, resetSession } from './session';
@@ -43,7 +43,7 @@ function warnOnce(key: string, message: string): void {
 }
 
 function pageViewMeta(referrer: string): Record<string, unknown> {
-  const query = window.location.search.replace(/^\?/, '');
+  const query = currentQuery();
 
   return { referrer: referrer.slice(0, LIMITS.referrer), query: query.slice(0, LIMITS.query) };
 }

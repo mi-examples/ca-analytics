@@ -93,7 +93,7 @@ Analytics Enabled]`) counts as *not set* and falls through to the option or defa
 
 | Event | Fires when | `meta` |
 | --- | --- | --- |
-| `page_view` | Once on `init()`, then on every `pushState` / `replaceState` / `popstate`, or on demand via `trackPageView()`. | `referrer`, `query` — always both, always strings |
+| `page_view` | Once on `init()`, then on every `pushState` / `replaceState` / `popstate` / `hashchange`, or on demand via `trackPageView()`. | `referrer`, `query` — always both, always strings |
 | `heartbeat` | Tab visible: every 60s for 5 beats, then every 300s. | `{}` |
 | `component_render` | The `mi-render` `CustomEvent` MI dispatches on `document`. | `component`, `element_id`, `segment_id`, plus each prop as `prop.<path>` |
 | `element_click` | `trackElement()`. | `element_id`, `segment_id`, plus your own keys |
@@ -111,11 +111,18 @@ Two meta keys are reserved: `_truncated` is stamped only when meta actually exce
 characters, and the dashboard hides both `_truncated` and `capped` from its property view, so do
 not use either as your own prop name.
 
-**`page_view`** dedupes on path + search, so a router calling `replaceState` for scroll or filter
-sync does not emit. `meta.referrer` follows GA4 semantics: the first view of the document uses
-`document.referrer` normalized to origin + pathname; every later view uses the `page_path` of the
-previous view. `meta.query` is `location.search` without the leading `?`. Both are capped at 300
-characters; either can be `''`.
+**`page_view`** dedupes on path + search (+ hash route, see below), so a router calling
+`replaceState` for scroll or filter sync does not emit. `meta.referrer` follows GA4 semantics: the
+first view of the document uses `document.referrer` normalized to origin + pathname; every later
+view uses the `page_path` of the previous view. `meta.query` is `location.search` without the
+leading `?`. Both are capped at 300 characters; either can be `''`.
+
+**Hash routing.** Hash-routed apps (for example React Router's `HashRouter`) are tracked without
+extra setup. When `location.hash` starts with `#/`, the fragment is the route: `#/reports/42?tab=1`
+records `page_path` `/reports/42` (it replaces any path below the portal page), and the fragment's
+own query is appended to `meta.query` with `&` (`?embed=1#/reports?tab=1` → `embed=1&tab=1`). A
+change of the hash route is a new view. A plain in-page anchor (`#section`, anything not starting
+with `#/`) is not a route: it never changes `page_path` and never emits a `page_view`.
 
 **`component_render`** reads `detail.component` plus `detail.props`. `MiNamespace.render()` is a
 pure event emitter, so `document` sees every shared component render — no patching.
@@ -156,7 +163,7 @@ stamps itself — the client never sends it.
 | `app` | text | Portal page internal name, read from `location.pathname` against `/^\/(p[tl]?)\/([^/]+)(.*)$/`. Capped at 100. |
 | `event` | text | Capped at 100. |
 | `session_id` | text | New session after 30 minutes idle. Survives reloads via `localStorage`. |
-| `page_path` | text | Route below the portal page, `/` at the root. Capped at 400. |
+| `page_path` | text | Route below the portal page, `/` at the root; a `#/` hash route when present (see [Hash routing](#events)). Capped at 400. |
 | `element_id` | int | `0` when not applicable. Integers only. |
 | `version` | text | This package's version, capped at 20. |
 | `meta` | text | JSON string, capped at 2000. |
