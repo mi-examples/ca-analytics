@@ -4,6 +4,8 @@ export type JsonValue = string | number | boolean | null | undefined | JsonValue
 export interface Options {
   /** false disables all tracking. Overrides PP_VARIABLES. */
   enabled?: boolean;
+  /** true tracks on a local dev server too (localhost, *.localhost, 127.x.x.x, 0.0.0.0, [::1]). Off by default. */
+  trackLocalhost?: boolean;
 }
 
 /** Row exactly as POSTed. owner_user_id is stamped server-side, never sent. */
