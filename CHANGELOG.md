@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0](https://github.com/mi-examples/ca-analytics/compare/v0.3.0...v0.4.0) (2026-11-12)
+
+### Features
+
+- `init()` now stays silent on a local dev server (`localhost`, `*.localhost`, `127.x.x.x`, `0.0.0.0` or `[::1]`), so your own runs through `pp-dev` no longer land in the app's dataset. Pass `init({ trackLocalhost: true })` to test tracking locally.
+
 ## [0.3.0](https://github.com/mi-examples/ca-analytics/compare/v0.2.0...v0.3.0) (2026-09-28)
 
 ### ⚠ Breaking changes
