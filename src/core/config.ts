@@ -32,6 +32,27 @@ function matchPage(): RegExpExecArray | null {
   return MI_PAGE_PATH_RE.exec(window.location.pathname);
 }
 
+const LOOPBACK_IPV4_RE = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+
+/** A local dev server's hostname. `location.hostname` keeps the brackets around an IPv6 address and a trailing dot. */
+export function isLocalHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '[::1]' ||
+    host === '0.0.0.0' ||
+    LOOPBACK_IPV4_RE.test(host)
+  );
+}
+
+function onLocalHost(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false;
+
+  return isLocalHost(window.location.hostname);
+}
+
 /** A hash router's fragment (`#/reports`). A plain in-page anchor (`#section`) is not a route. */
 export function isHashRoute(hash: string): boolean {
   return hash.startsWith('#/');
@@ -70,11 +91,14 @@ export function currentQuery(): string {
   return outer && inner ? `${outer}&${inner}` : outer || inner;
 }
 
-/** Runtime config, or null when ca-analytics must stay silent: disabled, or not on a portal page. */
+/** Runtime config, or null when ca-analytics must stay silent: disabled, on a local host, or not on a portal page. */
 export function resolveConfig(options: Options = {}): ResolvedConfig | null {
   const enabled = options.enabled ?? readFlag('CUSTOM_APP_ANALYTICS_ENABLED') ?? true;
 
   if (!enabled) return null;
+
+  // pp-dev serves the portal-page path locally, so a developer's own runs would land in the real dataset.
+  if (!options.trackLocalhost && onLocalHost()) return null;
 
   // Page internal_name: both the row's attribution key and the write endpoint's page.
   const app = (matchPage()?.[2] ?? '').slice(0, WIDTHS.app);

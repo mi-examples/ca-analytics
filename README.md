@@ -85,11 +85,12 @@ functions are dropped.
 
 ### Options
 
-Every option is optional. Each falls back to a portal-page variable, then to a default.
+Every option is optional. `enabled` falls back to a portal-page variable, then to a default.
 
 | Option | Variable | Default | Effect |
 | --- | --- | --- | --- |
 | `enabled` | `CUSTOM_APP_ANALYTICS_ENABLED` | `true` | `false` disables all tracking. |
+| `trackLocalhost` | — | `false` | `true` tracks on a local dev server too. See [Local development](#local-development). |
 
 Portal-page variables are read from `window.PP_VARIABLES` and always arrive as **strings**.
 `'0'`, `'false'`, `'n'`, `'no'` (case-insensitive, trimmed) mean disabled; any other non-empty
@@ -178,8 +179,26 @@ stamps itself — the client never sends it.
 | `version` | text | This package's version, capped at 20. |
 | `meta` | text | JSON string, capped at 2000. |
 
-`pp-dev` serves that same path locally. **Off that path shape, `init()` stays silent** rather
-than writing rows with a blank `app` that nothing could attribute.
+**Off that path shape, `init()` stays silent** rather than writing rows with a blank `app` that
+nothing could attribute.
+
+### Local development
+
+`pp-dev` serves that same path locally and proxies the write to the real instance, so a
+developer's own runs would land in the app's dataset. `init()` therefore stays silent when
+`location.hostname` is `localhost`, ends in `.localhost`, or is a loopback address (`127.x.x.x`,
+`0.0.0.0`, `[::1]`).
+
+To test tracking against a local dev server, opt in:
+
+```ts
+init({ trackLocalhost: true });
+```
+
+There is no portal-page variable for this: `pp-dev` reads the variables from the real page, so
+a variable would switch local tracking on for every developer. A dev server opened through
+another hostname (a LAN IP, a custom hosts entry) is not recognized as local; pass
+`enabled: false` there.
 
 Text columns are wide (10500) and the caps above are client-side payload budget, keeping a batch
 inside `sendBeacon`'s 64 KiB quota — they are not schema limits.
